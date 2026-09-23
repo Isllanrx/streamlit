@@ -35,6 +35,12 @@ if TYPE_CHECKING:
 
     assert_type(cached_data_fn_background(1, "2"), bool)
 
+    @st.cache_data(copy="cow")
+    def cached_data_fn_cow(arg1: int, arg2: str) -> bool:
+        return True
+
+    assert_type(cached_data_fn_cow(1, "2"), bool)
+
     assert_type(cached_data_fn(1, "2"), bool)
     assert_type(cached_data_fn.clear(), None)
     assert_type(cached_data_fn.clear(1), None)
