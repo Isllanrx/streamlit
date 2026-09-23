@@ -869,6 +869,8 @@ class CachedFunc(Generic[P, R]):
             # cooldown, so a later stale window can refresh again even if an earlier
             # refresh failed and the entry then hard-expired and recomputed here.
             cache.clear_refresh_cooldown(value_key)
+            if hasattr(cache, "deliver_value"):
+                return cast("R", cache.deliver_value(computed_value))
             return computed_value
         except (CacheError, RuntimeError) as ex:
             # An exception was thrown while we tried to write to the cache. Report
