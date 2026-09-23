@@ -136,6 +136,56 @@ class CacheDataTest(unittest.TestCase):
         assert r1 == [1, 1]
         assert r2 == [0, 1]
 
+    @patch.object(st, "exception")
+    def test_mutate_return_cow_dataframe(self, exception):
+        """Mutating a DataFrame cached with copy='cow' does not affect future
+        accessors of the cached data and isolates column/index mutations.
+        """
+        import pandas as pd
+
+        @st.cache_data(copy="cow")
+        def get_df():
+            return pd.DataFrame({"a": [1, 2, 3], "b": [4, 5, 6]})
+
+        df1 = get_df()
+        df1["a"] = [9, 9, 9]
+        df1.index.name = "modified_index"
+
+        df2 = get_df()
+
+        exception.assert_not_called()
+        assert list(df1["a"]) == [9, 9, 9]
+        assert df1.index.name == "modified_index"
+        assert list(df2["a"]) == [1, 2, 3]
+        assert df2.index.name is None
+
+    def test_cache_data_cow_zero_unpickle_overhead(self):
+        """Verify that copy='cow' avoids pickle.loads on in-memory hits."""
+        import pandas as pd
+
+        @st.cache_data(copy="cow")
+        def get_data():
+            return pd.DataFrame({"x": [10, 20]})
+
+        # First call: computes and writes to cow entries
+        _ = get_data()
+
+        # Second call: hit should read directly from cow entries without pickle.loads
+        with patch("pickle.loads") as mock_loads:
+            df2 = get_data()
+            mock_loads.assert_not_called()
+            assert list(df2["x"]) == [10, 20]
+
+    def test_cache_data_invalid_copy_option(self):
+        """Passing an invalid copy option raises StreamlitValueError."""
+        with pytest.raises(StreamlitValueError) as exc:
+
+            @st.cache_data(copy="invalid_option")  # type: ignore[arg-type]
+            def get_data():
+                return 42
+
+        assert "copy" in str(exc.value)
+
     def test_cached_member_function_with_hash_func(self):
         """@st.cache_data can be applied to class member functions
         with corresponding hash_func.
